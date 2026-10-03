@@ -41,19 +41,22 @@ int main(int argc, char **argv) {
           case 0:
             seed = atoi(optarg);
             if (seed <= 0){
-              seed = 1;
+              printf("seed must be positive");
+              return 1;
             }
             break;
           case 1:
             array_size = atoi(optarg);
             if (array_size <= 0){
-              array_size = 10;
+              printf("array_size must be positive");
+              return 1;
             }
             break;
           case 2:
             pnum = atoi(optarg);
-            if (pnum > array_size){
-              pnum = array_size;
+            if (pnum <= 0 || pnum > array_size || array_size % pnum != 0){
+              printf("array_size must be positive, less than array_size and array_size \% pnum must be zero");
+              return 1;
             }
             break;
           case 3:
@@ -94,6 +97,18 @@ int main(int argc, char **argv) {
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
+  int sect_length = array_size / pnum;
+  int fd[2];
+  if (pipe(fd) == -1) {
+        perror("pipe");
+        exit(1);
+  }
+  FILE **files;
+  files = calloc(pnum, sizeof(*files));
+  for (int i = 0; i < pnum; i++){
+    files[i] = tmpfile();
+  }
+
   for (int i = 0; i < pnum; i++) {
     pid_t child_pid = fork();
     if (child_pid >= 0) {
@@ -104,10 +119,15 @@ int main(int argc, char **argv) {
 
         // parallel somehow
 
+        int begin = i * sect_length;
+        int end = begin + sect_length;
+
+        struct MinMax min_max = GetMinMax(array, begin, end);
+
         if (with_files) {
-          // use files here
+          fwrite(&min_max, sizeof(struct MinMax), 1, files[i]);
         } else {
-          // use pipe here
+          write(fd[1], &min_max, sizeof(struct MinMax));
         }
         return 0;
       }
@@ -119,7 +139,7 @@ int main(int argc, char **argv) {
   }
 
   while (active_child_processes > 0) {
-    // your code here
+    wait(NULL);
 
     active_child_processes -= 1;
   }
@@ -129,17 +149,16 @@ int main(int argc, char **argv) {
   min_max.max = INT_MIN;
 
   for (int i = 0; i < pnum; i++) {
-    int min = INT_MAX;
-    int max = INT_MIN;
+    struct MinMax section_min_max;
 
     if (with_files) {
-      // read from files
+      fread(&section_min_max, sizeof(struct MinMax), 1, files[i]);
     } else {
-      // read from pipes
+      read(fd[0], &section_min_max, sizeof(struct MinMax));
     }
 
-    if (min < min_max.min) min_max.min = min;
-    if (max > min_max.max) min_max.max = max;
+    if (section_min_max.min < min_max.min) min_max.min = section_min_max.min;
+    if (section_min_max.max > min_max.max) min_max.max = section_min_max.max;
   }
 
   struct timeval finish_time;
