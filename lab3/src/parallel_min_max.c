@@ -15,10 +15,15 @@
 #include "find_min_max.h"
 #include "utils.h"
 
+void childKiller(){
+  kill(0, SIGKILL);
+}
+
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
   int pnum = -1;
+  int timeout = -1;
   bool with_files = false;
 
   while (true) {
@@ -28,6 +33,7 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
+                                      {"timeout", required_argument, 0, 0},
                                       {0, 0, 0, 0}};
 
     int option_index = 0;
@@ -55,12 +61,19 @@ int main(int argc, char **argv) {
           case 2:
             pnum = atoi(optarg);
             if (pnum <= 0 || pnum > array_size || array_size % pnum != 0){
-              printf("array_size must be positive, less than array_size and array_size \% pnum must be zero");
+              printf("pnum must be positive, less than array_size and array_size \% pnum must be zero");
               return 1;
             }
             break;
           case 3:
             with_files = true;
+            break;
+          case 4:
+            timeout = atoi(optarg);
+            if (timeout <= 0){
+              printf("timeout must be positive");
+              return 1;
+            }
             break;
 
           defalut:
@@ -107,6 +120,11 @@ int main(int argc, char **argv) {
   files = calloc(pnum, sizeof(*files));
   for (int i = 0; i < pnum; i++){
     files[i] = tmpfile();
+  }
+
+  if (timeout > 0){
+    signal(SIGALRM, childKiller);
+    alarm(timeout);
   }
 
   for (int i = 0; i < pnum; i++) {
