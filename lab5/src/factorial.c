@@ -20,14 +20,16 @@ pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 
 void PartialCalcMod(const struct Section *arg_pointer) {
 	int local_result = 1;
-	for (int i=(*arg_pointer).begin; i < (*arg_pointer).end; i++) {
-		local_result *= i;
+  int i;
+	for (i=(*arg_pointer).begin; i < (*arg_pointer).end; i++) {
+		local_result *= (i % (*arg_pointer).mod);
 		local_result %= (*arg_pointer).mod;
 	}
+  printf("B: %d, E: %d, LocalResult: %d\n", (*arg_pointer).begin, (*arg_pointer).end, local_result);
 	pthread_mutex_lock(&mut);
 	result *= local_result;
 	result %= (*arg_pointer).mod;
-	// printf("Result: %d\n", result);
+	printf("Result: %d\n", result);
 	pthread_mutex_unlock(&mut);
 }
 
